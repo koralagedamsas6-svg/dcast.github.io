@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#000000">
+    <title>Music Player | YouTube Library</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #fff;
+            background: #000;
+            --base: #121212;
+            --card: #181818;
+            --hover: #282828;
+            --muted: #a7a7a7;
+            --green: #1db954;
+            --red: #ff3345;
+        }
+
+        * { box-sizing: border-box; }
+        body { min-width: 320px; height: 100vh; margin: 0; overflow: hidden; background: radial-gradient(circle at top, #1a2337 0, #030303 36%, #000 100%); }
+        button, input { font: inherit; }
+        button { color: inherit; }
+        .app-layout { display: flex; height: calc(100vh - 90px); gap: 8px; padding: 8px; }
+        .sidebar { display: flex; width: 286px; min-width: 245px; flex-direction: column; gap: 8px; }
+        .nav-box, .library-box, .main-panel, .right-panel { border: 1px solid rgba(255,255,255,.05); border-radius: 8px; background: var(--base); box-shadow: inset 0 1px 0 rgba(255,255,255,.02); }
+        .nav-box { display: grid; gap: 8px; padding: 16px; }
+        .nav-link { display: flex; align-items: center; gap: 15px; padding: 9px 6px; color: #b3b3b3; font-size: 14px; font-weight: 700; text-decoration: none; }
+        .nav-link:hover { color: white; }
+        .library-box { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 14px 12px; }
+        .library-heading, .library-title, .filter-list, .topbar, .input-group, .player-left, .player-controls, .control-row, .timeline, .player-right { display: flex; align-items: center; }
+        .library-heading { justify-content: space-between; padding: 0 6px 10px; color: #b3b3b3; font-weight: 700; }
+        .library-title { gap: 10px; font-size: 13px; }
+        .youtube-label { padding: 3px 7px; border-radius: 4px; background: #b91c1c; color: white; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+        .filter-list { gap: 6px; overflow-x: auto; padding: 4px 2px 12px; }
+        .filter-btn { flex: 0 0 auto; padding: 7px 10px; border: 0; border-radius: 999px; background: #282828; color: white; cursor: pointer; font-size: 11px; white-space: nowrap; }
+        .filter-btn:hover { background: #393939; }
+        .filter-btn.active { background: #fff; color: #000; }
+        .sidebar-list { min-height: 0; overflow: auto; }
+        .sidebar-track { display: flex; width: 100%; align-items: center; gap: 10px; padding: 7px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; }
+        .sidebar-track:hover, .sidebar-track.active { background: #282828; }
+        .sidebar-track.active .track-name { color: var(--green); }
+        .track-cover { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 5px; background: #222; object-fit: cover; }
+        .track-meta, .track-name, .track-artist { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .track-name { color: white; font-size: 12px; font-weight: 700; }
+        .track-artist { margin-top: 3px; color: var(--muted); font-size: 10px; }
+        .main-panel { display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, rgba(20,41,71,.96), rgba(18,18,18,.98) 44%); }
+        .topbar { min-height: 64px; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .input-group { min-width: 0; gap: 10px; padding: 9px 13px; border-radius: 999px; background: #282828; }
+        .search-group { width: 34%; }
+        .import-group { width: 47%; }
+        .input-group i { flex: 0 0 auto; color: #aaa; }
+        .input-group input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #fff; font-size: 11px; }
+        .input-group:focus-within { box-shadow: 0 0 0 1px var(--green); }
+        .add-btn { flex: 0 0 auto; padding: 7px 11px; border: 0; border-radius: 999px; background: var(--green); color: #041008; cursor: pointer; font-size: 10px; font-weight: 800; white-space: nowrap; }
+        .add-btn:hover { background: #1ed760; }
+        .content-scroll { min-height: 0; flex: 1; overflow: auto; padding: 20px 24px 30px; }
+        .content-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .content-heading h1 { margin: 0; font-size: 24px; letter-spacing: -.5px; }
+        .content-heading p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+        .table-wrap { overflow-x: auto; }
+        .song-table { width: 100%; border-collapse: collapse; color: #b3b3b3; font-size: 11px; text-align: left; }
+        .song-table th { padding: 10px 9px; border-bottom: 1px solid #333; color: #999; font-size: 9px; letter-spacing: .7px; text-transform: uppercase; }
+        .song-table td { height: 58px; padding: 7px 9px; border-bottom: 1px solid transparent; }
+        .song-table tbody tr { cursor: pointer; }
+        .song-table tbody tr:hover { background: rgba(255,255,255,.08); }
+        .song-table tbody tr.active-row { background: #282828; }
+        .song-table tbody tr.active-row td:first-child { color: var(--green); }
+        .number-cell { width: 36px; color: #999; text-align: center; }
+        .table-track { display: flex; min-width: 180px; align-items: center; gap: 10px; }
+        .table-track .track-cover { width: 42px; height: 42px; flex-basis: 42px; }
+        .category-tag { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #292929; color: #ddd; font-size: 9px; white-space: nowrap; }
+        .source-cell { color: var(--red); font-size: 10px; font-weight: 700; white-space: nowrap; }
+        .right-panel { display: flex; width: 286px; min-width: 250px; flex-direction: column; gap: 15px; padding: 16px; }
+        .right-panel h2 { margin: 0; color: #ddd; font-size: 13px; }
+        .video-frame { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #333; border-radius: 8px; background: #000; }
+        #youtubeIframeContainer, #youtubeIframeContainer iframe { width: 100%; height: 100%; }
+        .panel-song-title { overflow: hidden; font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        .panel-song-artist { overflow: hidden; margin-top: 4px; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+        .direct-card { padding: 12px; border: 1px solid #303030; border-radius: 8px; background: var(--card); color: #aaa; font-size: 10px; line-height: 1.5; }
+        .direct-card strong { display: block; margin-bottom: 4px; color: #fff; font-size: 11px; }
+        .direct-card strong i { margin-right: 5px; color: var(--green); }
+        .player-bar { display: flex; height: 90px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px; border-top: 1px solid rgba(255,255,255,.07); background: rgba(4,4,4,.96); }
+        .player-left { width: 27%; min-width: 150px; gap: 10px; }
+        .mini-cover { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 4px; object-fit: cover; }
+        .mini-meta { min-width: 0; }
+        .mini-title, .mini-artist { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mini-title { font-size: 12px; font-weight: 700; }
+        .mini-artist { margin-top: 4px; color: var(--muted); font-size: 10px; }
+        .player-controls { width: 45%; max-width: 620px; flex-direction: column; gap: 7px; }
+        .control-row { justify-content: center; gap: 19px; }
+        .control-btn { display: grid; width: 28px; height: 28px; place-items: center; border: 0; background: transparent; color: #aaa; cursor: pointer; font-size: 13px; }
+        .control-btn:hover, .control-btn.on { color: var(--green); }
+        .play-btn { width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #000; }
+        .play-btn:hover { color: #000; transform: scale(1.06); }
+        .timeline { width: 100%; gap: 8px; color: #aaa; font-size: 9px; font-variant-numeric: tabular-nums; }
+        .progress-track, .volume-track { height: 4px; overflow: hidden; border-radius: 99px; background: #4d4d4d; cursor: pointer; }
+        .progress-track { position: relative; flex: 1; }
+        .progress-fill, .volume-fill { height: 100%; border-radius: inherit; background: #fff; }
+        .progress-fill { width: 0; }
+        .progress-track:hover .progress-fill { background: var(--green); }
+        .player-right { width: 22%; justify-content: flex-end; gap: 10px; color: #aaa; }
+        .volume-track { width: 85px; }
+        .volume-fill { width: 80%; background: var(--green); }
+        .empty-state { padding: 24px; color: #aaa; text-align: center; }
+        @media (max-width: 1100px) {
+            .right-panel { display: none; }
+            .sidebar { width: 260px; }
+        }
+        @media (max-width: 720px) {
+            .app-layout { height: calc(100vh - 76px); padding: 0; }
+            .sidebar { display: none; }
+            .main-panel { border-radius: 0; }
+            .topbar { align-items: stretch; flex-direction: column; padding: 12px; }
+            .search-group, .import-group { width: 100%; }
+            .content-scroll { padding: 16px 12px 24px; }
+            .content-heading h1 { font-size: 20px; }
+            .song-table th, .song-table td { padding-right: 6px; padding-left: 6px; }
+            .hide-mobile { display: none; }
+            .player-bar { height: 76px; padding: 0 10px; }
+            .player-left { width: auto; min-width: 0; flex: 1; }
+            .mini-cover { width: 42px; height: 42px; flex-basis: 42px; }
+            .player-controls { width: auto; }
+            .player-right { display: none; }
+            .control-row { gap: 9px; }
+            .timeline { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-layout">
+        <aside class="sidebar" aria-label="Music library">
+            <nav class="nav-box" aria-label="Main navigation">
+                <a href="#" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
+                <a href="#searchInput" class="nav-link"><i class="fa-solid fa-magnifying-glass"></i> Search</a>
+            </nav>
+            <section class="library-box">
+                <div class="library-heading">
+                    <span class="library-title"><i class="fa-solid fa-bookmark"></i> Your Library</span>
+                    <span class="youtube-label">YouTube</span>
+                </div>
+                <div class="filter-list" id="categoryPills" aria-label="Filter by category"></div>
+                <div class="sidebar-list" id="sidebarList" aria-label="Track list"></div>
+            </section>
+        </aside>
+
+        <main class="main-panel">
+            <header class="topbar">
+                <label class="input-group search-group">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" id="searchInput" placeholder="Search tracks, artists..." aria-label="Search tracks or artists">
+                </label>
+                <form class="input-group import-group" id="importForm">
+                    <i class="fa-brands fa-youtube" style="color:#ff3345"></i>
+                    <input type="text" id="ytUrlInput" placeholder="Paste a YouTube link or video ID..." aria-label="YouTube URL or video ID">
+                    <button class="add-btn" type="submit">Add Song</button>
+                </form>
+            </header>
+            <section class="content-scroll">
+                <div class="content-heading">
+                    <div><h1 id="headingTitle">All YouTube Songs</h1><p id="trackCounter" aria-live="polite"></p></div>
+                </div>
+                <div class="table-wrap">
+                    <table class="song-table">
+                        <thead><tr><th class="number-cell">#</th><th>Title &amp; Artist</th><th class="hide-mobile">Category</th><th class="hide-mobile">Source</th><th style="text-align:right"><i class="fa-regular fa-clock" aria-label="Duration"></i></th></tr></thead>
+                        <tbody id="songsTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <aside class="right-panel" aria-label="YouTube audio player">
+            <h2><i class="fa-brands fa-youtube" style="color:#ff3345;margin-right:7px"></i>YouTube Audio Player</h2>
+            <div class="video-frame"><div id="youtubeIframeContainer"></div></div>
+            <div><div class="panel-song-title" id="panelSongTitle">Select a track</div><div class="panel-song-artist" id="panelSongArtist">YouTube Audio Player</div></div>
+            <div class="direct-card"><strong><i class="fa-solid fa-circle-check"></i> YouTube playback</strong>Choose a track to play its video. Playback availability depends on the video and YouTube.</div>
+        </aside>
+    </div>
+
+    <footer class="player-bar">
+        <div class="player-left">
+            <img class="mini-cover" id="miniCover" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150" alt="Current track artwork">
+            <div class="mini-meta"><div class="mini-title" id="miniTitle">Select a song</div><div class="mini-artist" id="miniArtist">YouTube track library</div></div>
+        </div>
+        <div class="player-controls">
+            <div class="control-row">
+                <button class="control-btn" id="btnShuffle" type="button" aria-label="Toggle shuffle" aria-pressed="false"><i class="fa-solid fa-shuffle"></i></button>
+                <button class="control-btn" id="btnPrevious" type="button" aria-label="Previous track"><i class="fa-solid fa-backward-step"></i></button>
+                <button class="control-btn play-btn" id="btnPlay" type="button" aria-label="Play" disabled><i class="fa-solid fa-play"></i></button>
+                <button class="control-btn" id="btnNext" type="button" aria-label="Next track"><i class="fa-solid fa-forward-step"></i></button>
+                <button class="control-btn" id="btnRepeat" type="button" aria-label="Toggle repeat" aria-pressed="false"><i class="fa-solid fa-repeat"></i></button>
+            </div>
+            <div class="timeline">
+                <span id="currentTimeLabel">0:00</span>
+                <div class="progress-track" id="progressTrack" role="slider" tabindex="0" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-fill" id="progressFill"></div></div>
+                <span id="durationTimeLabel">0:00</span>
+            </div>
+        </div>
+        <div class="player-right"><i class="fa-solid fa-volume-high"></i><div class="volume-track" id="volumeTrack" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80"><div class="volume-fill" id="volumeFill"></div></div></div>
+    </footer>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        const seedTracks = [
+            { title: "Manike Mage Hithe", artist: "Yohani & Satheeshan", ytId: "fJ9rUzIMcZQ", category: "Sinhala Hits", duration: "2:44" },
+            { title: "Rawatuna Mathakaye", artist: "Ridma Weerawardena", ytId: "09R8_2nJtjg", category: "Sinhala Hits", duration: "4:02" },
+            { title: "Suraangana Kirilli", artist: "Costha & Drill Team", ytId: "kJQP7kiw5Fk", category: "Sinhala Hits", duration: "3:15" },
+            { title: "Naadagamkarayo Theme", artist: "Centigradz", ytId: "JGwWNGJdvx8", category: "Sinhala Hits", duration: "3:40" },
+            { title: "Sanda Mithuri", artist: "Kasun Kalhara", ytId: "OPf0YbXqDm0", category: "Sinhala Hits", duration: "4:12" },
+            { title: "Shape of You", artist: "Ed Sheeran", ytId: "JGwWNGJdvx8", category: "Pop Hits", duration: "3:53" },
+            { title: "Blinding Lights", artist: "The Weeknd", ytId: "4NRXx6U8ABQ", category: "Pop Hits", duration: "3:20" },
+            { title: "Stay", artist: "The Kid LAROI & Justin Bieber", ytId: "kTJczUociss", category: "Pop Hits", duration: "2:21" },
+            { title: "As It Was", artist: "Harry Styles", ytId: "H5v3kku4y6Q", category: "Pop Hits", duration: "2:47" },
+            { title: "Levitating", artist: "Dua Lipa", ytId: "TUVcZfQe-Kw", category: "Pop Hits", duration: "3:23" },
+            { title: "Believer", artist: "Imagine Dragons", ytId: "7wtfhZwyrcc", category: "Rock & Metal", duration: "3:24" },
+            { title: "Smells Like Teen Spirit", artist: "Nirvana", ytId: "hTWKbfoikeg", category: "Rock & Metal", duration: "4:38" },
+            { title: "Lofi Beats for Chill", artist: "Lofi Girl", ytId: "jfKfPfyJRdk", category: "Lo-Fi & Chill", duration: "LIVE" },
+            { title: "Faded", artist: "Alan Walker", ytId: "60ItHLz5WEA", category: "EDM Hits", duration: "3:32" }
+        ];
+        const categories = ["Sinhala Hits", "Pop Hits", "Rock & Metal", "Lo-Fi & Chill", "EDM Hits"];
+        const coverImages = [
+            "photo-1511671782779-c97d3d27a1d4",
+            "photo-1508700115892-45ecd05ae2ad",
+            "photo-1493225457124-a3eb161ffa5f",
+            "photo-1514525253161-7a46d19cd819",
+            "photo-1470225620780-dba8ba36b745"
+        ];
+        const songCatalog = seedTracks.map((track, index) => ({
+            ...track,
+            id: index + 1,
+            img: `https://images.unsplash.com/${coverImages[index % coverImages.length]}?w=160&h=160&fit=crop`
+        }));
+        for (let index = 0; index < 105 - seedTracks.length; index += 1) {
+            const base = seedTracks[index % seedTracks.length];
+            songCatalog.push({
+                ...base,
+                id: songCatalog.length + 1,
+                title: `${base.title} · Mix ${Math.floor(index / seedTracks.length) + 2}`,
+                img: `https://images.unsplash.com/${coverImages[(index + seedTracks.length) % coverImages.length]}?w=160&h=160&fit=crop`
+            });
+        }
+
+        let ytPlayer = null;
+        let playerReady = false;
+        let currentTrackIndex = 0;
+        let displayedTracks = [...songCatalog];
+        let shuffle = false;
+        let repeat = false;
+        let progressTimer = null;
+        let activeCategory = "All";
+
+        const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        })[char]);
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player("youtubeIframeContainer", {
+                width: "100%",
+                height: "100%",
+                videoId: songCatalog[0].ytId,
+                playerVars: { playsinline: 1, controls: 1, autoplay: 0, rel: 0 },
+                events: { onReady: handlePlayerReady, onStateChange: handlePlayerState }
+            });
+        }
+
+        function handlePlayerReady() {
+            playerReady = true;
+            document.getElementById("btnPlay").disabled = false;
+            loadTrack(0, false);
+        }
+
+        function handlePlayerState(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                document.getElementById("btnPlay").innerHTML = '<i class="fa-solid fa-pause"></i>';
+                document.getElementById("btnPlay").setAttribute("aria-label", "Pause");
+                clearInterval(progressTimer);
+                progressTimer = setInterval(updateProgress, 500);
+            } else {
+                document.getElementById("btnPlay").innerHTML = '<i class="fa-solid fa-play"></i>';
+                document.getElementById("btnPlay").setAttribute("aria-label", "Play");
+                clearInterval(progressTimer);
+                if (event.data === YT.PlayerState.ENDED) {
+                    if (repeat) ytPlayer.playVideo();
+                    else playNextTrack();
+                }
+            }
+        }
+
+        function loadTrack(index, autoplay = true) {
+            currentTrackIndex = (index + songCatalog.length) % songCatalog.length;
+            const track = songCatalog[currentTrackIndex];
+            document.getElementById("miniCover").src = track.img;
+            document.getElementById("miniTitle").textContent = track.title;
+            document.getElementById("miniArtist").textContent = track.artist;
+            document.getElementById("panelSongTitle").textContent = track.title;
+            document.getElementById("panelSongArtist").textContent = track.artist;
+            document.getElementById("progressFill").style.width = "0%";
+            document.getElementById("currentTimeLabel").textContent = "0:00";
+            document.getElementById("durationTimeLabel").textContent = track.duration;
+            if (playerReady && ytPlayer) {
+                if (autoplay) ytPlayer.loadVideoById(track.ytId);
+                else ytPlayer.cueVideoById(track.ytId);
+            }
+            renderTracks();
+        }
+
+        function togglePlayPause() {
+            if (!playerReady || !ytPlayer) return;
+            if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
+            else ytPlayer.playVideo();
+        }
+
+        function playNextTrack() {
+            const next = shuffle
+                ? Math.floor(Math.random() * songCatalog.length)
+                : (currentTrackIndex + 1) % songCatalog.length;
+            loadTrack(next, true);
+        }
+
+        function playPreviousTrack() {
+            if (playerReady && ytPlayer && ytPlayer.getCurrentTime() > 3) {
+                ytPlayer.seekTo(0, true);
+                return;
+            }
+            loadTrack((currentTrackIndex - 1 + songCatalog.length) % songCatalog.length, true);
+        }
+
+        function updateProgress() {
+            if (!playerReady || !ytPlayer) return;
+            const current = ytPlayer.getCurrentTime() || 0;
+            const duration = ytPlayer.getDuration() || 0;
+            const progress = duration ? current / duration * 100 : 0;
+            document.getElementById("progressFill").style.width = `${progress}%`;
+            document.getElementById("currentTimeLabel").textContent = formatTime(current);
+            document.getElementById("durationTimeLabel").textContent = formatTime(duration);
+            const slider = document.getElementById("progressTrack");
+            slider.setAttribute("aria-valuemax", String(Math.floor(duration)));
+            slider.setAttribute("aria-valuenow", String(Math.floor(current)));
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+        }
+
+        function seekTo(clientX) {
+            if (!playerReady || !ytPlayer || !ytPlayer.getDuration()) return;
+            const track = document.getElementById("progressTrack");
+            const bounds = track.getBoundingClientRect();
+            const fraction = Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width));
+            ytPlayer.seekTo(ytPlayer.getDuration() * fraction, true);
+        }
+
+        function setVolume(clientX) {
+            if (!playerReady || !ytPlayer) return;
+            const track = document.getElementById("volumeTrack");
+            const bounds = track.getBoundingClientRect();
+            const volume = Math.round(Math.min(1, Math.max(0, (clientX - bounds.left) / bounds.width)) * 100);
+            ytPlayer.setVolume(volume);
+            document.getElementById("volumeFill").style.width = `${volume}%`;
+            track.setAttribute("aria-valuenow", String(volume));
+        }
+
+        function renderFilters() {
+            const filters = ["All", ...categories];
+            document.getElementById("categoryPills").innerHTML = filters.map(category => `
+                <button type="button" class="filter-btn ${category === activeCategory ? "active" : ""}" data-category="${escapeHtml(category)}">
+                    ${category === "All" ? `All (${songCatalog.length})` : escapeHtml(category)}
+                </button>
+            `).join("");
+            document.querySelectorAll(".filter-btn").forEach(button => button.addEventListener("click", () => {
+                activeCategory = button.dataset.category;
+                document.querySelectorAll(".filter-btn").forEach(item => item.classList.toggle("active", item === button));
+                applyFilters();
+            }));
+        }
+
+        function applyFilters() {
+            const query = document.getElementById("searchInput").value.trim().toLowerCase();
+            displayedTracks = songCatalog.filter(track => {
+                const categoryMatch = activeCategory === "All" || track.category === activeCategory;
+                const queryMatch = `${track.title} ${track.artist} ${track.category}`.toLowerCase().includes(query);
+                return categoryMatch && queryMatch;
+            });
+            document.getElementById("headingTitle").textContent = activeCategory === "All" ? "All YouTube Songs" : `${activeCategory} Playlist`;
+            renderTracks();
+        }
+
+        function renderTracks() {
+            const activeId = songCatalog[currentTrackIndex].id;
+            document.getElementById("trackCounter").textContent = `Showing ${displayedTracks.length} of ${songCatalog.length} tracks`;
+            const table = document.getElementById("songsTableBody");
+            if (!displayedTracks.length) {
+                table.innerHTML = '<tr><td colspan="5" class="empty-state">No songs match your search.</td></tr>';
+            } else {
+                table.innerHTML = displayedTracks.map((track, index) => `
+                    <tr data-track-id="${track.id}" class="${track.id === activeId ? "active-row" : ""}" tabindex="0" aria-label="Play ${escapeHtml(track.title)} by ${escapeHtml(track.artist)}">
+                        <td class="number-cell">${index + 1}</td>
+                        <td><div class="table-track"><img class="track-cover" src="${track.img}" alt=""><div class="track-meta"><div class="track-name">${escapeHtml(track.title)}</div><div class="track-artist">${escapeHtml(track.artist)}</div></div></div></td>
+                        <td class="hide-mobile"><span class="category-tag">${escapeHtml(track.category)}</span></td>
+                        <td class="hide-mobile"><span class="source-cell"><i class="fa-brands fa-youtube"></i> YouTube</span></td>
+                        <td style="text-align:right">${escapeHtml(track.duration)}</td>
+                    </tr>
+                `).join("");
+                table.querySelectorAll("tr[data-track-id]").forEach(row => {
+                    const play = () => {
+                        const index = songCatalog.findIndex(track => track.id === Number(row.dataset.trackId));
+                        if (index >= 0) loadTrack(index, true);
+                    };
+                    row.addEventListener("click", play);
+                    row.addEventListener("keydown", event => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            play();
+                        }
+                    });
+                });
+            }
+            const sidebar = document.getElementById("sidebarList");
+            sidebar.innerHTML = displayedTracks.slice(0, 30).map(track => `
+                <button type="button" class="sidebar-track ${track.id === activeId ? "active" : ""}" data-track-id="${track.id}">
+                    <img class="track-cover" src="${track.img}" alt="">
+                    <span class="track-meta"><span class="track-name">${escapeHtml(track.title)}</span><span class="track-artist">${escapeHtml(track.artist)}</span></span>
+                </button>
+            `).join("");
+            sidebar.querySelectorAll(".sidebar-track").forEach(row => row.addEventListener("click", () => {
+                const index = songCatalog.findIndex(track => track.id === Number(row.dataset.trackId));
+                if (index >= 0) loadTrack(index, true);
+            }));
+        }
+
+        function extractVideoId(input) {
+            if (/^[\w-]{11}$/.test(input)) return input;
+            let url;
+            try { url = new URL(input); } catch { return null; }
+            const host = url.hostname.replace(/^www\./, "").toLowerCase();
+            let videoId = "";
+            if (host === "youtu.be") videoId = url.pathname.split("/").filter(Boolean)[0] || "";
+            else if (["youtube.com", "m.youtube.com", "music.youtube.com"].includes(host)) {
+                videoId = url.searchParams.get("v") || url.pathname.match(/^\/(?:embed|shorts)\/([^/?]+)/)?.[1] || "";
+            }
+            return /^[\w-]{11}$/.test(videoId) ? videoId : null;
+        }
+
+        function addYouTubeTrack(event) {
+            event.preventDefault();
+            const input = document.getElementById("ytUrlInput");
+            const videoId = extractVideoId(input.value.trim());
+            if (!videoId) {
+                input.setCustomValidity("Enter a valid YouTube video URL or 11-character video ID.");
+                input.reportValidity();
+                return;
+            }
+            input.setCustomValidity("");
+            const track = {
+                id: songCatalog.length ? Math.max(...songCatalog.map(item => item.id)) + 1 : 1,
+                title: `YouTube Track ${videoId}`,
+                artist: "Added from YouTube",
+                ytId: videoId,
+                category: "Custom",
+                duration: "—",
+                img: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+            };
+            songCatalog.unshift(track);
+            activeCategory = "All";
+            input.value = "";
+            renderFilters();
+            applyFilters();
+            loadTrack(0, true);
+        }
+
+        document.getElementById("searchInput").addEventListener("input", applyFilters);
+        document.getElementById("importForm").addEventListener("submit", addYouTubeTrack);
+        document.getElementById("ytUrlInput").addEventListener("input", event => event.currentTarget.setCustomValidity(""));
+        document.getElementById("btnPlay").addEventListener("click", togglePlayPause);
+        document.getElementById("btnNext").addEventListener("click", playNextTrack);
+        document.getElementById("btnPrevious").addEventListener("click", playPreviousTrack);
+        document.getElementById("btnShuffle").addEventListener("click", event => {
+            shuffle = !shuffle;
+            event.currentTarget.classList.toggle("on", shuffle);
+            event.currentTarget.setAttribute("aria-pressed", String(shuffle));
+        });
+        document.getElementById("btnRepeat").addEventListener("click", event => {
+            repeat = !repeat;
+            event.currentTarget.classList.toggle("on", repeat);
+            event.currentTarget.setAttribute("aria-pressed", String(repeat));
+        });
+        document.getElementById("progressTrack").addEventListener("click", event => seekTo(event.clientX));
+        document.getElementById("progressTrack").addEventListener("keydown", event => {
+            if (!playerReady || !ytPlayer || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+            event.preventDefault();
+            ytPlayer.seekTo(Math.max(0, ytPlayer.getCurrentTime() + (event.key === "ArrowRight" ? 5 : -5)), true);
+        });
+        document.getElementById("volumeTrack").addEventListener("click", event => setVolume(event.clientX));
+        document.getElementById("volumeTrack").addEventListener("keydown", event => {
+            if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+            event.preventDefault();
+            const currentVolume = playerReady && ytPlayer ? ytPlayer.getVolume() : 80;
+            const volume = Math.min(100, Math.max(0, currentVolume + (event.key === "ArrowRight" ? 5 : -5)));
+            if (playerReady && ytPlayer) ytPlayer.setVolume(volume);
+            document.getElementById("volumeFill").style.width = `${volume}%`;
+            event.currentTarget.setAttribute("aria-valuenow", String(volume));
+        });
+
+        renderFilters();
+        applyFilters();
+    </script>
+</body>
+</html>
